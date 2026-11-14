@@ -17,7 +17,7 @@
 // /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
 
-import { copyFileSync, statSync } from 'node:fs';
+import { copyFileSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const src = new URL('./entry.png', import.meta.url);
@@ -33,4 +33,16 @@ const expected = statSync(src).size;
 const written = statSync(dest).size;
 if (written !== expected) {
   throw new Error(`entry.png copy incomplete: wrote ${written} of ${expected} bytes`);
+}
+
+// The gate takes a whole PNG of at most 1 MiB and 1024 by 1024 pixels:
+// check the copy is a whole PNG (magic bytes) and inside the size cap
+// before handing it to the judge.
+const head = readFileSync(dest).subarray(0, 8);
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+if (!head.equals(PNG_MAGIC)) {
+  throw new Error('entry.png is not a whole PNG (bad magic bytes)');
+}
+if (written > 1048576) {
+  throw new Error(`entry.png over the 1 MiB gate: ${written} bytes`);
 }
